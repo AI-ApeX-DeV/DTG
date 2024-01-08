@@ -1,0 +1,16 @@
+## When to enter market
+I] Check the general trend of the market for a longer period
+	i) If trend is upwards: 
+		If candle stick pattern indicates growth:
+			If RSI is low enough:
+				If price is near a support:
+					If price is near a moving average and historically above it:
+						Set stop loss and targets using the ATR metric
+	   	elif candlestick pattern indicates decline:
+			If RSI is high enough:
+				If price is near resistance
+					If price is near moving average and historically below it:
+						Give a buy order for when the price comes back up
+		else:
+			wait for next candle(this is where predicting the next candle is helpful)
+	ii) If trend is downwards, lookout for trend reversal
