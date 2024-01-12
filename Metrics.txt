@@ -1,0 +1,167 @@
+cell -1 
+
+test_df['New_usd'] = test_df['Balance_BTC']*test_df['open']+test_df['Balance_USD']
+# test_df = test_df.drop(columns=['Change', 'eqity','Daily_Return','Cumulative_Return','Peak','Drawdown','TradeOutcome'])
+
+cell -2
+
+test_df['Change'] = test_df['New_usd'].diff()
+
+# Separate positive changes (profits) and negative changes (losses)
+gross_profit = test_df[test_df['Change'] > 0]['Change'].sum()
+gross_loss = test_df[test_df['Change'] < 0]['Change'].sum()
+net_profit = gross_profit-abs(gross_loss)
+
+# Display the results
+print(f'Total Gross Profit: ${ gross_profit :.2f}')
+print(f'Total Gross Loss: ${abs(gross_loss):.2f}')
+print(f'Net Profit : ${(gross_profit-abs(gross_loss)) :.2f}')
+
+
+cell -3
+
+test_df['TradeOutcome'] = test_df['Change'].apply(lambda x: 'Winning' if x > 0 else ('Losing' if x < 0 else 'No Change'))
+
+# Count the number of winning, losing, and total trades
+winning_trades = len(test_df[test_df['TradeOutcome'] == 'Winning'])
+losing_trades = len(test_df[test_df['TradeOutcome'] == 'Losing'])
+total_trades = winning_trades + losing_trades
+Average_Winning_Trades = gross_profit / winning_trades
+Average_Losing_Trades = abs(gross_loss) / losing_trades
+Win_Rate = winning_trades/total_trades
+
+# Display the results
+print(f'Number of Winning Trades: {winning_trades}')
+print(f'Number of Losing Trades: {losing_trades}')
+print(f'Total Number of Trades: {total_trades}')
+print(f'Win Rate: {winning_trades/total_trades}')
+print(f'Average Winning Trades: {gross_profit / winning_trades}')
+print(f'Average loosing Trades: {abs(gross_loss) / losing_trades}')
+
+cell - 4
+
+# Assuming you have a column 'new_usd' in your DataFrame representing the equity curve
+equity_curve = test_df['New_usd']
+
+# Initialize variables
+peak_value = equity_curve.iloc[0]
+max_drawdown = 0
+current_drawdown = 0
+
+# Iterate through the equity curve
+for value in equity_curve:
+    if value > peak_value:
+        peak_value = value
+        current_drawdown = 0
+    else:
+        drawdown = (peak_value - value) / peak_value
+        current_drawdown = max(current_drawdown, drawdown)
+        max_drawdown = max(max_drawdown, current_drawdown)
+
+# Convert drawdown to percentage
+max_drawdown_percentage = max_drawdown * 100
+
+# Display the result
+print(f'Maximum Drawdown: {max_drawdown_percentage:.2f}%')
+
+cell - 5
+
+# Assuming 'new_usd' is the column representing the equity curve
+returns = test_df['New_usd'].pct_change().dropna()  # Calculate daily returns
+
+# Assuming a risk-free rate of 0 for simplicity
+risk_free_rate = 0
+
+# Calculate average return and standard deviation of returns
+average_return = returns.mean()
+std_dev_return = returns.std()
+
+# Calculate Sharpe ratio
+sharpe_ratio = (average_return - risk_free_rate) / std_dev_return
+
+# Display the result
+print(f'Sharpe Ratio: {sharpe_ratio:.4f}')
+
+cell - 6
+
+# Calculate the risk-reward ratio
+risk_reward_ratio = gross_profit /abs(gross_loss)
+
+# Display the result
+print(f'Risk-Reward Ratio: {risk_reward_ratio:.2f}')
+
+cell -7
+
+# Identify consecutive 'Holding' signals
+holding_signals = (test_df['Signal'] == 'holding').astype(int)
+consecutive_holdings = holding_signals.groupby((holding_signals != holding_signals.shift()).cumsum()).cumsum()
+
+# Find the maximum number of consecutive 'Holding' signals
+max_consecutive_holdings = consecutive_holdings.max()
+
+# Multiply the maximum by 5 to get the result in minutes
+result_in_minutes = max_consecutive_holdings * 5
+
+# Display the result
+# print(f'Max Duration Time of Single Trade: {max_consecutive_holdings}')
+print(f'Max Duration Time of Single Trade in minutes: {result_in_minutes}')
+
+cell - 8
+
+# Create a new column 'SignalType' and fill NaN with -1
+test_df['SignalType'] = -1
+
+# Assign 1 to 'SignalType' for buy signals
+test_df.loc[test_df['Signal'] == 'buy', 'SignalType'] = 1
+
+# Assign 0 to 'SignalType' for sell signals
+test_df.loc[test_df['Signal'] == 'Sell', 'SignalType'] = 0
+
+cell - 9
+
+# Initialize variables
+largest_losing_trade = 0
+largest_winning_trade = 0
+
+# Iterate through the DataFrame
+for i in range(len(test_df)):
+    # Check for consecutive buy and sell pairs
+    if test_df['SignalType'].iloc[i] == 1:
+        # Find the next sell point after each buy point
+        sell_point_after_buy = test_df['SignalType'].iloc[i+1:].eq(0).idxmax()
+
+        if pd.notna(sell_point_after_buy):  # Check if not NaT
+            # Calculate the difference for the consecutive buy and sell pair
+            diff = test_df.loc[sell_point_after_buy, 'New_usd'] - test_df.loc[i, 'New_usd']
+
+            # Update the largest winning and losing trade accordingly
+            if diff.max() > largest_winning_trade:
+                largest_winning_trade = diff.max()
+            if diff.min() < largest_losing_trade:
+                largest_losing_trade = diff.min()
+
+# Display the results
+print(f'Largest Winning Trade (in USDT): {largest_winning_trade:.2f}')
+print(f'Largest Losing Trade (in USDT): {largest_losing_trade:.2f}')
+
+# Calculate the duration of each holding
+holdings_duration = consecutive_holdings * 5  # Assuming each row represents 5 minutes
+
+# Calculate Sortino Ratio
+risk_free_rate = 0  # Assuming a risk-free rate of 0 for simplicity
+daily_returns = test_df['New_usd'].pct_change().dropna()
+downside_returns = daily_returns[daily_returns < risk_free_rate]
+downside_deviation = downside_returns.std()
+sortino_ratio = (daily_returns.mean() - risk_free_rate) / downside_deviation
+
+# Calculate average holding duration per trade
+average_holding_duration = holdings_duration.mean()
+
+# Calculate max dip and average dip in running trades
+max_dip = (test_df['New_usd'].min() - test_df['New_usd'].cummax()).max()
+average_dip = (test_df['New_usd'] - test_df['New_usd'].cummax()).mean()
+
+print(f'Sortino Ratio: {sortino_ratio:.4f}')
+print(f'Average Holding Duration per Trade: {average_holding_duration:.2f} minutes')
+print(f'Max Dip in Running Trade: {max_dip:.2f} USDT')
+print(f'Average Dip in Running Trade: {average_dip:.2f} USDT')
